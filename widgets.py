@@ -24,7 +24,7 @@ is not provided here, such as the ability to place widgets with layouts and
 groups. This is being developed here.
 
 Contributions are welcome. Visit my Github respository at
-https://github.com/eschan145/Armies. From there, you can submit pull requests
+https://github.com/eschan145/futura. From there, you can submit pull requests
 or chat in discussions.
 
 Code and graphics by Ethan Chan
@@ -42,9 +42,9 @@ from tkinter import TclError, Tk
 from typing import Tuple
 from webbrowser import open_new
 
-from arcade import (ShapeElementList, Sprite, SpriteList, Window,
+from arcade import (ShapeElementList, Sprite, SpriteList,
                     create_rectangle_outline, draw_rectangle_outline,
-                    get_window, load_texture, run)
+                    get_window, load_texture)
 from pyglet import options
 from pyglet.app import run
 from pyglet.clock import get_frequency
@@ -61,21 +61,18 @@ from pyglet.text.formats.structured import (ImageElement, OrderedListBuilder,
                                             UnorderedListBuilder)
 from pyglet.text.layout import IncrementalTextLayout, TextLayout
 
-from .color import (BLACK, BLUE_YONDER, COOL_BLACK, DARK_GRAY, DARK_SLATE_GRAY,
-                    RED, SMOKY_BLACK, WHITE, four_byte)
+from .color import (BLACK, COOL_BLACK, DARK_GRAY, DARK_SLATE_GRAY, RED,
+                    four_byte)
 from .file import (blank1, entry_focus, entry_hover, entry_normal, knob,
                    slider_horizontal, toggle_false, toggle_false_hover,
                    toggle_true, toggle_true_hover, widgets)
 from .geometry import Point, are_rects_intersecting, get_distance
-from .key import (ALT, BACKSPACE, CONTROL, ENTER, KEY_LEFT, KEY_RIGHT,
-                  MOTION_BACKSPACE, MOTION_BEGINNING_OF_FILE,
-                  MOTION_BEGINNING_OF_LINE, MOTION_COPY, MOTION_DELETE,
-                  MOTION_DOWN, MOTION_END_OF_FILE, MOTION_END_OF_LINE,
-                  MOTION_LEFT, MOTION_NEXT_WORD, MOTION_PREVIOUS_WORD,
-                  MOTION_RIGHT, MOTION_UP, MOUSE_BUTTON_LEFT, SHIFT, SPACE,
-                  TAB, A, B, C, I, Keys, V, X)
-from .layout import Group
-from .management import Application
+from .key import (ALT, CONTROL, ENTER, KEY_LEFT, KEY_RIGHT, MOTION_BACKSPACE,
+                  MOTION_BEGINNING_OF_FILE, MOTION_BEGINNING_OF_LINE,
+                  MOTION_COPY, MOTION_DELETE, MOTION_DOWN, MOTION_END_OF_FILE,
+                  MOTION_END_OF_LINE, MOTION_LEFT, MOTION_NEXT_WORD,
+                  MOTION_PREVIOUS_WORD, MOTION_RIGHT, MOTION_UP,
+                  MOUSE_BUTTON_LEFT, SHIFT, SPACE, TAB, A, B, C, I, Keys, V, X)
 
 options["debug_gl"] = False
 
@@ -127,6 +124,26 @@ DEFAULT_FONT = ["Montserrat", 12]
 
 DEFAULT_LABEL_COLORS = [BLACK, (COOL_BLACK, DARK_SLATE_GRAY, DARK_GRAY)]
 
+def _exclude(exclusions):
+    import types
+
+    # Add everything as long as it's not a module and not prefixed with _
+    functions = [name for name, function in globals().items()
+                 if not (name.startswith('_') or isinstance(function, types.ModuleType))]
+
+    # Remove the exclusions from the functions
+    for exclusion in exclusions:
+        if exclusion in functions:
+            functions.remove(exclusion)
+
+    del types  # Deleting types from scope, introduced from the import
+
+    return functions
+
+
+# The _ prefix is important, to not add these to the __all__
+# _exclusions = ["function1", "function2"]
+# __all__ = _exclude(_exclusions)
 
 def set_container(_container):
     """Set the current container. This can be used for multiple views or
@@ -1383,11 +1400,33 @@ class Widget(Rect, EventDispatcher):
     which can be accessed just by getting its properties. Dispatching events
     makes subclassing a widget and creating your own very easy.
 
-    Widgets can have components, which are essentially smaller, secondary
-    widgets that are inside the widget. For example, a button widget has a
-    Label and an Image for components. A widget can have a main component,
-    which takes the hitbox used for detecting states. For a button widget the
-    main component would be the Image.
+    Widgets must have several things.
+
+    1. Specified main widget in widget parameter
+
+       This part must be set. Some different elements are supported by Futura,
+       including pyglet.text.layouts.TextLayouts and arcade.Sprites. Basically,
+       anything with _width and _height or content_width and _content_height
+       properties.
+
+       It is the widget that takes the hitbox points for collision detection.
+
+    2. Children (sometimes)
+
+       Widgets should have children if they have elements from other widgets.
+       Very primitive elements are not necessary for this. A widget with
+       children is recognized as a group of widgets, and therefore can have
+       focus traversal. Single widgets, without any children, are not
+       recognized by focus traversal.
+
+    3. Drawing and update functions
+
+       Widgets must have a draw function defined. It may be blank. In the
+       future this may be made optional. They should also have an update
+       function.
+
+    If you have an error, double-check your code is using the right datatype
+    or the value is valid.
 
     Plenty of things are built-in here. For example, you can access the
     current window just by using the window property. Or the key state handler
@@ -1409,8 +1448,6 @@ class Widget(Rect, EventDispatcher):
           be worked on for the built-in widgets. If you would like to work on
           these post your enhancements in the discussions.
 
-          https://github.com/eschan145/Armies/discussions/1
-
         1. Adding left, right, top, and bottom properties to widgets. This has
            been implemented in arcade sprites and should be for this too. It
            can be useful for enhanced positioning.
@@ -1425,6 +1462,9 @@ class Widget(Rect, EventDispatcher):
         2. Move documentation from setters to getters for properties. I think
            this is a big stretch; it will cost me literally thousands of
            deletions on my repository.
+
+           Actually not really. I was able to do this without too many
+           deletions.
     """
 
     def __init__(self, widget=None, image=blank1, scale=1.0, frame=None):
@@ -2195,11 +2235,13 @@ class Label(Widget):
         self.label.y = y
 
     def _get_text(self):
-        """Set the text of the label. It is not recommended to call this
-        repeatedly with a high update rate, as this can cause the fps to drop.
+        """Text of the label. It is not recommended to call this repeatedly
+        with a high update rate, as this can cause the fps to drop.
 
         FIXME: text changing styles after deleting and then replacing text
                (COMPLETED)
+
+        See pyglet.text.layout.TextLayout documentation for details.
 
         type: property, str
         """
@@ -2442,8 +2484,6 @@ class Button(Widget):
     its command, which is a function or callable.
     """
 
-    keys = []
-
     def __init__(
                  self, text, x, y, command=None, parameters=[],
                  link=None, colors=["yellow", DEFAULT_LABEL_COLORS],
@@ -2509,6 +2549,7 @@ class Button(Widget):
         self.font = font
         self.callback = callback
 
+        self.keys = []
         self.bindings = []
 
         # Find a way to fit to 80 chars
@@ -2641,8 +2682,7 @@ class Button(Widget):
             open_new(self.link)
 
     def draw(self):
-        """Draw the button. The component of the button is the image, which takes
-        all of the collision points.
+        """Draw the button.
 
         1. Image - background image of the button
         2. Label - text of the button
@@ -2748,9 +2788,6 @@ class Slider(Widget):
     https://github.com/eschan145/Armies/issues/20
     """
 
-    _value = 0
-    destination = 0
-
     def __init__(self, x, y, colors=DEFAULT_LABEL_COLORS, font=DEFAULT_FONT,
                  default=0, size=100, length=200, padding=50, round=None,
                  group=None
@@ -2794,6 +2831,9 @@ class Slider(Widget):
 
         self.x = x
         self.y = y
+
+        self.value = 0
+        self.destination = 0
 
     def _update_position(self, x, y):
         """Update the position of the widget. This is called internally
@@ -3474,9 +3514,7 @@ class Entry(Widget):
     6. Finish up scrolling of history. This is incomplete, and if text is
        added before the history's index, then the index is not changed.
 
-    https://github.com/eschan145/Armies/issues/11
-
-    Last updated: August 4th 2022
+    https://github.com/eschan145/futura/issues/1#issue-1393607169
     """
 
     # Simple validations
@@ -3496,29 +3534,15 @@ class Entry(Widget):
                                         )
     VALIDATION_REGULAR = None
 
-    blinking = True
-    length = 0
-    max = MAX
+    _history_index = 0
+
     _validate = VALIDATION_LETTERS
     _document = None
     _placeholder = None
 
-    undo_stack = []
-    redo_stack = []
-
     normal_image = load_texture(entry_normal)
     hover_image = load_texture(entry_hover)
     focus_image = load_texture(entry_focus)
-
-    history = []
-    _history_index = 0
-
-    edit_bold = False
-    edit_italic = False
-
-    text_options = {
-        "title_case" : True,
-    }
 
     def __init__(self, x, y, text="", font=default_font, color=BLACK,
                  history=True):
@@ -4420,10 +4444,19 @@ class Pushable(Widget):
         self.image.y = self.label.y = y
 
     def invoke(self):
+        """Invoke the button. This switches its image to a pressed state and
+        calls the its associated command with the specified parameters. If the
+        button is disabled this has no effect.
+
+        Dispatches the on_push event.
+        """
+
         if self.disable or not self.command:
             return
 
         self.press = True
+
+        self.dispatch_event("on_push")
 
         if self.parameters:
             self.command(self.parameters)
@@ -4431,21 +4464,51 @@ class Pushable(Widget):
             self.command()
 
     def draw(self):
-        # Update Label properties
+        """Draw the button.
 
-        self.label.text = self.text
-        self.label.colors[0] = BLACK
-        self.label.font = self.font
-
-        # self.component = self.image
+        1. Image - background image of the button
+        2. Label - text of the button
+        """
 
     def on_press(self, x, y, buttons, modifiers):
+        """The button is pressed. This invokes its command if the mouse button
+        is the left one.
+
+        TODO: add specifying proper mouse button in settings
+
+        x - x position of the press
+        y - y position of the press
+        buttons - buttons that were pressed with the mouse
+        modifiers - modifiers being held down
+
+        parameters: int, int, int (32-bit), int (32-bit)
+        """
+
         if buttons == MOUSE_BUTTON_LEFT:
             self.invoke()
 
     def on_key(self, keys, modifiers):
+        """A key is pressed. This is used for keyboard shortcuts when the
+        button has focus.
+
+        keys - key pressed
+        modifiers - modifier pressed
+
+        parameters: int (32-bit), int (32-bit)
+        """
+
         if keys == SPACE and self.focus:
             self.invoke()
+
+    def on_key_press(self, keys, modifiers):
+        """A key is pressed, regardless if the button has focus. Used for
+        binding commands to keyboard events.
+
+        keys - key pressed
+        modifiers - modifier pressed
+
+        parameters: int, int
+        """
 
         if isinstance(self.bindings, list):
             if keys in self.bindings:
@@ -4465,5 +4528,3 @@ class Pushable(Widget):
 
         # .update is not called for the Label, as it is uneccessary for the
         # Label to switch colors on user events.
-
-
